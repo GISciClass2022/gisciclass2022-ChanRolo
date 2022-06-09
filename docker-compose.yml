@@ -1,6 +1,6 @@
 services:
   app:
-    image: rsnaru/2022gisci_class_x86_64:latest
+    image: rsnaru/2022gisci_class_m1:latest
     #build: .
     volumes:
       - .:/home/rstudio/

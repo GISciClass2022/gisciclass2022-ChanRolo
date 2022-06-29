@@ -1,0 +1,214 @@
+---
+title: "GIScience class final report"
+author: "HUANG CHENAN"
+date: "2022/06/25"
+output:
+  html_document:
+    df_print: paged
+    theme: flatly
+    toc: yes
+    toc_float: true
+  github_document:
+    toc: yes
+subtitle: "緊急事態宣言と人口流動の関係"
+fontsize: 11pt
+linestretch: 1.2
+link-citations: yes
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setlocale("LC_CTYPE", "ja_JP.UTF-8")
+```
+
+```{r library, include=FALSE, warning=FALSE}
+library(readr)
+library(sf)
+library(dplyr)
+library(spData)
+library(spDataLarge)
+library(tmap)
+library(tmaptools)
+library(kableExtra)
+library(magick)
+```
+
+```{r Data Import, include=FALSE, warning=FALSE}
+# 日本1kmメッシュのデータ
+jp_mesh1km = st_read("/home/rstudio/class/exercise1/data/japan_mesh1km/mesh1.shp")
+
+# 日本の行政区域データ
+jp_area_map = st_read("/home/rstudio/class/exercise1/data/japan_line/japan_ver84.shp")
+
+# 東京1kmメッシュの人流データ
+pop_tokyo_2020_02 = read.csv("/home/rstudio/class/exercise1/data/tokyo_mobility/2020_02_tokyo.csv", encoding="UTF-8")
+pop_tokyo_2020_04 = read.csv("/home/rstudio/class/exercise1/data/tokyo_mobility/2020_04_tokyo.csv", encoding="UTF-8")
+pop_tokyo_2021_01 = read.csv("/home/rstudio/class/exercise1/data/tokyo_mobility/2021_01_tokyo.csv", encoding="UTF-8")
+pop_tokyo_2021_05 = read.csv("/home/rstudio/class/exercise1/data/tokyo_mobility/2021_05_tokyo.csv", encoding="UTF-8")
+pop_tokyo_2021_07 = read.csv("/home/rstudio/class/exercise1/data/tokyo_mobility/2021_07_tokyo.csv", encoding="UTF-8")
+```
+
+```{r Data Cleaning, include=FALSE, warning=FALSE}
+# データを加工する
+pop_tokyo_2020_02 = dplyr::filter(pop_tokyo_2020_02, dayflag == 2 & timezone ==0, citycode < 13361)
+pop_tokyo_2020_04 = dplyr::filter(pop_tokyo_2020_04, dayflag == 2 & timezone ==0, citycode < 13361)
+pop_tokyo_2021_01 = dplyr::filter(pop_tokyo_2021_01, dayflag == 2 & timezone ==0, citycode < 13361)
+pop_tokyo_2021_05 = dplyr::filter(pop_tokyo_2021_05, dayflag == 2 & timezone ==0, citycode < 13361)
+pop_tokyo_2021_07 = dplyr::filter(pop_tokyo_2021_07, dayflag == 2 & timezone ==0, citycode < 13361)
+```
+
+```{r Administrative Area Map, include=FALSE, warning=FALSE}
+# 行政区域データをtmapにより、可視化する
+jp_area_map = tm_shape(jp_area_map) +
+  tm_borders(alpha = 0.6)
+```
+
+## 0. 要旨
+2020年1月に国内で初めてCOVID-19を発症して以降、これまでに政府は4回の緊急事態宣言を掲げ、人々の外出を控えるように促した。
+強制的な都市封鎖を行う国に比べれば、日本は外出制限のような強硬な政策ではなく、穏健な方法を選んだ。
+このような政策が外出の減少に有効であったかどうかの検討が必要である。  
+従って、本報告では、人口流動データにより、緊急事態宣言前を基準として、緊急事態発生後の人口流動を可視化し、緊急事態宣言と人口流動の関係を検討した。
+結果として、第一回緊急事態宣言は人口流動を抑える効果があったが、その効果は徐々に薄れつつある。
+
+## 1. はじめに
+### 1.1 背景
+2019年に中国の武漢でCOVID-19が爆発して以降、世界中に感染が拡大し、多くの都市に影響を与え続けている。
+COVID-19の主要な感染経路は飛沫感染と接触感染であるとされるゆえに、人口密度の高い大都市において感染拡大のリスクがより高いと言われている[@yang2020transportation]。
+そのため、世界的にワクチン接種による感染予防や重症化予防を推進するとともに、都市の大規模封鎖（ロックダウン）などの社会的対策を講じ、感染拡大防止を実施してきた[@osawa2022assessing]。  
+一方、日本国内でも2020年1月に初めてCOVID-19を発症して以降、コロナ禍を対応するため、「緊急事態宣言」や「まん延防止等重点措置」などの外出自粛という政策を行った。 
+しかし、中国など大規模な都市封鎖政策を実施している国に比べれば、日本は特別的である。
+外出制限ではなく、緊急事態宣言などの自粛政策により、人々に動きを控えることを要請した。
+このような穏健な政策が効果を発揮したかどうかは、議論の余地がある。 
+従って、本稿では緊急事態宣言に基づいて人口移動の変化を分析する。
+
+### 1.2 目的
+今回は緊急事態宣言が人口移動の変化に与える影響に着目する。
+東京を研究範囲として、人口流動データにより、日本で実施された緊急事態宣言後の人口移動の変化を検討する。
+
+## 2. 手法
+### 範囲
+東京は、日本で最も人口規模が大きく、人口移動が活発な都市である。
+そのため、東京を分析範囲とした。
+また、小笠原諸島と伊豆諸島は、人口移動に関するデータが少ないため、今回の分析範囲外とする。
+
+### 基線
+2020年1月から、COVID-19は全国へ急速的に広がった。
+当初はCOVID-19の危険性が認識されていなかったことを考えると、人口移動にタイムラグがあったかもしれない。 そのため、2020年2月の人口移動データを基線として選び、緊急事態宣言が実施された月と比較することで、緊急事態宣言の効果を説明することにする。
+
+### 緊急事態宣言との比較
+4つの緊急事態宣言の時間前後を考慮するため、人口流動データによるダイナミックマップを作成し、人口流動の分布を観察する。 また、緊急事態宣言と基線の人口移動データの差値を比較し、人口移動の変化を定量的に把握する。
+
+## 3. データ
+平日、休日と祝日の人口流動の区別を考慮し、月別のデータを用い、不均一性を最小限に抑える。
+そのため、国土交通省が提供する日本の1kmメッシュ別の滞在人口データ(https://www.geospatial.jp/ckan/dataset/mlit-1km-fromto) を活用する。   
+その中、5ヶ月分のデータを選択する：  
+1. 2020年2月：緊急事態宣言前（基線）  
+2. 2020年4月：第一回緊急事態宣言  
+3. 2021年1月：第二回緊急事態宣言  
+4. 2021年5月：第三回緊急事態宣言  
+5. 2021年7月：第四回緊急事態宣言  
+また、夜間は住居に戻る人が多いことを考慮し、人の動きがより反映されるため、11:00〜15:00の平均データを選択した。  
+さらに、東京の市町村で人口流動データを可視化するため、環境省自然環境局生物多様性センターが提供する全国標準地域メッシュデータ(https://www.geospatial.jp/ckan/dataset/biodic-mesh/resource/38bd3651-120e-480f-99cf-7bb89cad7a05) と ESRI ジャパンの全国市区町村界データ(https://www.esrij.com/products/japan-shp/)を活用する。  
+
+## 4. 結果
+### 2020年2月の人口流動分布
+図1に示すように、2020年2月、COVID-19が日本国内で爆発したにもかかわらず、人口流動の分布は中心化の特点を見える。
+特に、駅（東京駅、新宿駅、秋葉原駅など）や繁華街（銀座、渋谷）に集中していた。
+最も人口移動が多いエリアは東京駅で、月間268,423人が移動していた。
+また、都心以外の人口流動も駅周辺に集中していた。
+$$図1　2020年2月の人口流動分布$$
+```{r 202002 mobility, echo=FALSE, warning=FALSE, message=FALSE}
+tmap_mode("view")
+# 人流データを1kmメッシュの地理空間データを関連する
+popmesh_tokyo_2020_02 = st_sf(pop_tokyo_2020_02 %>%
+                                mutate(name_1 = as.character(mesh1kmid)) %>%
+                                left_join(jp_mesh1km, by = c("name_1" = "Name")),
+                              crs=st_crs(jp_mesh1km))
+
+# 可視化する
+tm_shape(popmesh_tokyo_2020_02) + 
+  tm_fill(col = "population", 
+          palette =  get_brewer_pal("YlOrBr", n = 10, contrast = c(0, 0.9), plot = F),
+          breaks = c(0,5000,10000,15000,20000,30000,40000,60000,100000,150000,280000), 
+          midpoint = NA, 
+          alpha = 0.8) + 
+  jp_area_map +
+  tm_basemap(server ="OpenStreetMap")
+
+
+```
+
+### 緊急事態宣言後の人口流動分布
+4つの緊急事態宣言後の人口移動の分布を可視化した。  
+図2に示すように、第1回緊急事態宣言後、都心の人口流動は大きく減少した。
+基線（緊急事態宣言前）と比較すると、人流分布は比較的均等に分散していた。  
+また、第2回、第3回、第4回緊急事態宣言後も同様で、基線と比べると、人口流動が減少している。
+しかし、第1回緊急事態宣言後の人口移動と比較すると、逆に増加している。
+理由として、第2回、第3回、第4回の緊急事態宣言が2021年に発令された政策であり、人々はCOVID-19と共存する世界に適応し、COVID-19の影響が薄れているの可能性がある。
+$$図2　緊急事態宣言後の人口流動$$
+```{r DynamicMap, echo = FALSE, warning = FALSE}
+# DynamicMapを入力する
+image_read("/home/rstudio/class/exercise1/data/DynamicMap.gif")
+```
+
+### 緊急事態宣言後と基線の比較
+図2から、第一回緊急事態宣言が人口移動の抑制に最も効果がある。
+従って、本節で、第一回緊急事態宣言後（2020年4月）を主な観察対象とする。  
+第一回緊急事態宣言後と基線の人口流動の差値により、人口流動の変化量を計算した。
+表1に示すように、人口移動が最も減少した駅は東京駅であり、60.6%も減少した。 
+また、最も減少した繁華街は銀座であり、54.0％減少した。
+$$表1　人口流動データの変化値$$
+```{r table, echo = FALSE}
+#変化値(差値)を計算する
+change_first = dplyr::left_join(pop_tokyo_2020_02,pop_tokyo_2020_04, by = "mesh1kmid") %>%
+  dplyr::mutate(Change = population.y - population.x)
+
+# 変化値と地理空間データを関連する
+change_first = st_sf(change_first %>%
+                 mutate(name_1 = as.character(mesh1kmid)) %>%
+                 left_join(jp_mesh1km, by = c("name_1" = "Name")),
+               crs=st_crs(jp_mesh1km))
+
+# 表を作る
+table <- matrix(0, 7, 5)
+table[1,] <- c("","2020年2月","2020年4月","差値","変化量")
+table[2,] <- c("東京駅[人]", "268,423", "105,799","-162,624", "-60.6%")
+table[3,] <- c("品川駅[人]", "158,244", "65,014", "-93,230", "-58.9%")
+table[4,] <- c("銀座[人]", "179,494", "82,485", "-97,009", "-54.0%")
+table[5,] <- c("六本木通り[人]", "164,982", "78,999", "-85,983", "-52.1%")
+table[6,] <- c("新宿駅[人]", "181,303", "96,323", "-84,980", "-46.9%")
+table[7,] <- c("秋葉原駅[人]", "163,896", "90,905", "-72,991", "-44.5%")
+
+data <- table %>%
+  kbl() %>%
+  kable_material(c("striped", "hover"))
+
+data
+```
+
+そして、第一回緊急事態宣言と基線の差値を可視化した。  
+図3に示すように、人口流動が最も減少したエリアは都心部である。 
+また、都心部以外の地域で、駅周辺を除く、人口流動がほとんど増加した。 
+理由として、緊急事態宣言後、多くの企業がリモートワークを開始したことや、インターネットショッピングにより、都心の「利用必要性」は大幅に減少したと推測している。
+$$図3　人口流動の差値図$$
+```{r first emergency, echo = FALSE, message = FALSE, warning = FALSE}
+tmap_mode("plot")
+
+tm_shape(change_first) +  
+  tm_fill(col = "Change", 
+          breaks = c(-170000,-100000,-50000,-10000,-1000,0,500,1000,2000,4000,7000), 
+          palette = get_brewer_pal("RdYlGn", n = 10, contrast = c(0, 0.9), plot = F),
+          midpoint = NA, 
+          alpha = 0.8) + 
+  jp_area_map
+
+```
+
+
+## 5. 結論
+今回は、人流データにより、緊急事態宣言後の人口移動を可視化し、緊急事態宣言前と比較することで、緊急事態宣言が人口移動に与えた影響を視覚的に明らかにした。 
+また、ダイナミックマップにより、時間の経過とともに緊急事態宣言の効果が減少していたことを明確した。 
+
+
+## 6. 参考文献

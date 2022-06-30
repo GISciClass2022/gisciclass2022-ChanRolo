@@ -1,0 +1,44 @@
+
+
+
+```{r chapter 3.2.3}
+library(sf)
+library(raster)
+library(dplyr)
+library(stringr) # for working with strings (pattern matching)
+library(tidyr)   # for unite() and separate()
+library(spData)
+
+world
+coffee_data
+
+world_coffee = left_join(world, coffee_data, by = "name_long")
+class(world_coffee)
+world_coffee
+
+plot(world_coffee["coffee_production_2017"])
+
+world_coffee_inner <- inner_join(world, coffee_data)
+world_coffee_inner
+plot(world_coffee_inner["coffee_production_2017"])
+```
+
+```{r chapter 3.2.4}
+world_new = world # do not overwrite our original data
+world_new$pop_dens = world_new$pop / world_new$area_km2
+world_new
+world_new$pop_dens
+plot(world_new$pop_dens)
+
+world_new2 <- world %>%
+  mutate(pop_dens = pop/area_km2)
+
+world %>% transmute(pop_dens = pop/area_km2)
+world %>% transmute(pop_dens = pop/area_km2) %>% st_drop_geometry()
+
+```
+
+
+
+
+

@@ -1,0 +1,119 @@
+
+```{r leaflet map example}
+library(leaflet)
+popup = c("Chan", "Julie", "Lex")
+leaflet() %>%
+  addProviderTiles("OpenStreetMap.France") %>%
+  addCircles(color = "red",weight = 5, opacity = 1,
+             lng = c(-3, 23, 32),
+             lat = c(52, 53, 49), 
+             popup = popup)
+```
+
+# chapter 2
+```{r install packages}
+library(sf)
+library(raster)
+library(spData)
+library(spDataLarge)
+```
+
+
+```{r world data}
+names(world)
+plot(world)
+
+```
+
+```{r world life_exp}
+#world["lifeExp"]
+world %>% dplyr::select(lifeExp) %>% st_drop_geometry()
+#st_drop_geometry(world["lifeExp"])
+class(world)
+plot(world["lifeExp"])
+
+```
+
+```{r union}
+world_asia = world[world$continent == "Asia", ]
+asia = st_union(world_asia)
+#> although coordinates are longitude/latitude, st_union assumes that they are planar
+#world_asia
+#asia
+plot(world["pop"],reset = FALSE)
+plot(asia, add = TRUE, col = "red")
+```
+
+```{r}
+lnd_point = st_point(c(0.1, 51.5))                 # sfg object
+lnd_geom = st_sfc(lnd_point, crs = 4326)           # sfc object
+lnd_attrib = data.frame(                           # data.frame object
+  name = "London",
+  temperature = 25,
+  date = as.Date("2017-06-21")
+  )
+lnd_sf = st_sf(lnd_attrib, geometry = lnd_geom)    # sf object
+lnd_sf
+```
+
+
+
+```{r raster}
+raster_filepath = system.file("raster/srtm.tif", package = "spDataLarge")
+new_raster = raster(raster_filepath)
+new_raster
+plot(new_raster)
+```
+
+```{r brick}
+multi_raster_file = system.file("raster/landsat.tif", package = "spDataLarge")
+r_brick = brick(multi_raster_file)
+r_brick
+plot(r_brick)
+
+```
+
+```{r ndvi}
+ndvi = (r_brick[[4]] - r_brick[[3]])/(r_brick[[4]] + r_brick[[3]])
+plot(ndvi)
+```
+
+# chapter3
+```{r 3.1}
+library(sf)
+library(raster)
+library(dplyr)
+library(stringr) # for working with strings (pattern matching)
+library(tidyr)   # for unite() and separate()
+
+```
+
+```{r 3.2.1}
+world
+sel_area = world$area_km2 < 10000
+small_countries = world[sel_area, ]
+small_countries
+plot(small_countries)
+
+world %>% 
+  filter(area_km2 < 10000) %>%
+  dplyr::select(pop) %>%
+  plot()
+```
+
+```{r top n}
+#GDPperCapitaが10の国をピックアップして地図化してみましょう。
+world %>% 
+  dplyr::select(name_long,gdpPercap) %>% 
+  arrange(desc(gdpPercap)) %>%
+  st_drop_geometry()
+
+world %>%
+  dplyr::select(gdpPercap) %>%
+  top_n(n= -10 , wt = gdpPercap) %>%
+plot()
+
+
+
+```
+
